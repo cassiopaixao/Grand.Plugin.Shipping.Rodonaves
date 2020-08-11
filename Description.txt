@@ -1,0 +1,8 @@
+﻿Group: Shipping rate computation
+FriendlyName: RTE Rodonaves
+SystemName: Shipping.Rodonaves
+Version: 1.0
+SupportedVersions: 4.60
+Author: Cássio Paixão <cassio.paixao@gmail.com>
+DisplayOrder: 1
+FileName: Grand.Plugin.Shipping.Rodonaves.dll
