@@ -1,26 +1,34 @@
 ﻿using Grand.Framework.Controllers;
 using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security.Authorization;
 using Grand.Plugin.Shipping.Rodonaves.Models;
 using Grand.Services.Configuration;
 using Grand.Services.Localization;
+using Grand.Services.Security;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
 
 namespace Grand.Plugin.Shipping.Rodonaves.Controllers
 {
     [Area("Admin")]
     [AuthorizeAdmin]
+    [PermissionAuthorize(PermissionSystemName.ShippingSettings)]
     public class ShippingRodonavesController : BaseShippingController
     {
         #region fields
-        private readonly RodonavesSettings _settings;
+        private readonly RodonavesSettings _rodonavesSettings;
         private readonly ISettingService _settingService;
         private readonly ILocalizationService _localizationService;
+
         #endregion
 
         #region ctor
-        public ShippingRodonavesController(RodonavesSettings settings, ISettingService settingService, ILocalizationService localizationService)
+        public ShippingRodonavesController(
+            RodonavesSettings rodonavesSettings,
+            ISettingService settingService,
+            ILocalizationService localizationService)
         {
-            this._settings = settings;
+            this._rodonavesSettings = rodonavesSettings;
             this._settingService = settingService;
             this._localizationService = localizationService;
         }
@@ -30,23 +38,24 @@ namespace Grand.Plugin.Shipping.Rodonaves.Controllers
         public IActionResult Configure()
         {
             var model = new ConfigurationModel();
-            model.Username = _settings.Username;
-            model.Password = _settings.Password;
+            model.ApiUsername = _rodonavesSettings.ApiUsername;
+            model.ApiPassword = _rodonavesSettings.ApiPassword;
 
             return View("~/Plugins/Shipping.Rodonaves/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
-        public IActionResult Configure(ConfigurationModel model)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> Configure(ConfigurationModel model)
         {
-            model.Username = _settings.Username;
-            model.Password = _settings.Password;
-            _settingService.SaveSetting(_settings);
-            _settingService.ClearCache();
+            _rodonavesSettings.ApiUsername = model.ApiUsername;
+            _rodonavesSettings.ApiPassword = model.ApiPassword;
+            await _settingService.SaveSetting(_rodonavesSettings);
+            await _settingService.ClearCache();
 
             SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
-            return Configure();
+            return await Task.FromResult(Configure());
         }
         #endregion
     }

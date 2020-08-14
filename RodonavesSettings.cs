@@ -4,7 +4,7 @@ namespace Grand.Plugin.Shipping.Rodonaves
 {
     public class RodonavesSettings : ISettings
     {
-        public string Username { get; set; }
-        public string Password { get; set; }
+        public string ApiUsername { get; set; }
+        public string ApiPassword { get; set; }
     }
 }

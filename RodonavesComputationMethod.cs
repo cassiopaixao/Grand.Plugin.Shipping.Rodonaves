@@ -1,4 +1,5 @@
-﻿using Grand.Core.Domain.Orders;
+﻿using Grand.Core;
+using Grand.Core.Domain.Orders;
 using Grand.Core.Domain.Shipping;
 using Grand.Core.Plugins;
 using Grand.Services.Configuration;
@@ -17,12 +18,18 @@ namespace Grand.Plugin.Shipping.Rodonaves
         private readonly ISettingService _settingService;
         private readonly ILocalizationService _localizationService;
         private readonly ILanguageService _languageService;
+        private readonly IWebHelper _webHelper;
 
-        public RodonavesComputationMethod(ISettingService settingService, ILocalizationService localizationService, ILanguageService languageService)
+        public RodonavesComputationMethod(
+            ISettingService settingService,
+            ILocalizationService localizationService,
+            ILanguageService languageService,
+            IWebHelper webHelper)
         {
             _settingService = settingService;
             _localizationService = localizationService;
             _languageService = languageService;
+            _webHelper = webHelper;
         }
 
         public ShippingRateComputationMethodType ShippingRateComputationMethodType {
@@ -43,6 +50,10 @@ namespace Grand.Plugin.Shipping.Rodonaves
             viewComponentName = "";
         }
 
+        public override string GetConfigurationPageUrl()
+        {
+            return $"{_webHelper.GetStoreLocation()}Admin/ShippingRodonaves/Configure";
+        }
         public async Task<GetShippingOptionResponse> GetShippingOptions(GetShippingOptionRequest getShippingOptionRequest)
         {
             if (getShippingOptionRequest == null)
