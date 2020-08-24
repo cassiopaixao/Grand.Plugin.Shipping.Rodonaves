@@ -2,6 +2,7 @@
 using Grand.Core.Domain.Orders;
 using Grand.Core.Domain.Shipping;
 using Grand.Core.Plugins;
+using Grand.Plugin.Shipping.Rodonaves.Services;
 using Grand.Services.Configuration;
 using Grand.Services.Localization;
 using Grand.Services.Shipping;
@@ -18,27 +19,26 @@ namespace Grand.Plugin.Shipping.Rodonaves
         private readonly ISettingService _settingService;
         private readonly ILocalizationService _localizationService;
         private readonly ILanguageService _languageService;
+        private readonly IRodonavesService _rodonavesService;
         private readonly IWebHelper _webHelper;
 
         public RodonavesComputationMethod(
             ISettingService settingService,
             ILocalizationService localizationService,
             ILanguageService languageService,
+            IRodonavesService rodonavesService,
             IWebHelper webHelper)
         {
             _settingService = settingService;
             _localizationService = localizationService;
             _languageService = languageService;
+            _rodonavesService = rodonavesService;
             _webHelper = webHelper;
         }
 
-        public ShippingRateComputationMethodType ShippingRateComputationMethodType {
-            get { return ShippingRateComputationMethodType.Realtime; }
-        }
+        public ShippingRateComputationMethodType ShippingRateComputationMethodType => ShippingRateComputationMethodType.Realtime;
 
-        public IShipmentTracker ShipmentTracker {
-            get { return null; }
-        }
+        public IShipmentTracker ShipmentTracker => null;
 
         public Task<decimal?> GetFixedRate(GetShippingOptionRequest getShippingOptionRequest)
         {
@@ -54,22 +54,6 @@ namespace Grand.Plugin.Shipping.Rodonaves
         {
             return $"{_webHelper.GetStoreLocation()}Admin/ShippingRodonaves/Configure";
         }
-        public async Task<GetShippingOptionResponse> GetShippingOptions(GetShippingOptionRequest getShippingOptionRequest)
-        {
-            if (getShippingOptionRequest == null)
-                throw new ArgumentNullException("getShippingOptionRequest");
-
-            var response = new GetShippingOptionResponse();
-
-            response.ShippingOptions.Add(new ShippingOption() {
-                Name = _localizationService.GetResource("Plugins.Shipping.Rodonaves.PluginName"),
-                Description = _localizationService.GetResource("Plugins.Shipping.Rodonaves.PluginDescription"),
-                Rate = 10.0M,
-                ShippingRateComputationMethodSystemName = "Shipping.Rodonaves",
-            });
-
-            return await Task.FromResult(response);
-        }
 
         public Task<bool> HideShipmentMethods(IList<ShoppingCartItem> cart)
         {
@@ -81,14 +65,39 @@ namespace Grand.Plugin.Shipping.Rodonaves
             return await Task.FromResult(new List<string>());
         }
 
+        public async Task<GetShippingOptionResponse> GetShippingOptions(GetShippingOptionRequest getShippingOptionRequest)
+        {
+            if (getShippingOptionRequest == null)
+                throw new ArgumentNullException("getShippingOptionRequest");
+
+            var response = new GetShippingOptionResponse();
+            try
+            {
+                var rate = await _rodonavesService.GetRate(getShippingOptionRequest);
+
+                response.ShippingOptions.Add(new ShippingOption() {
+                    Name = _localizationService.GetResource("Plugins.Shipping.Rodonaves.PluginName"),
+                    Description = _localizationService.GetResource("Plugins.Shipping.Rodonaves.PluginDescription"),
+                    Rate = rate,
+                    ShippingRateComputationMethodSystemName = "Shipping.Rodonaves",
+                });
+            }
+            catch(Exception ex)
+            {
+                
+            }
+            
+            return response;
+        }
+
         public override async Task Install()
         {
             // settings
             await _settingService.SaveSetting(new RodonavesSettings());
 
             // locales
-            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginName", "Envio via Rodonaves");
-            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginDescriptor", "Valor de frete via Rodonaves");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginName", "RTE Rodonaves");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginDescription", "Receba em seu endereço");
 
             await base.Install();
         }
@@ -100,7 +109,7 @@ namespace Grand.Plugin.Shipping.Rodonaves
 
             // locales
             await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginName");
-            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginDescriptor");
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginDescription");
 
             await base.Uninstall();
         }
