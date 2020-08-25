@@ -5,6 +5,7 @@ using Grand.Core.Plugins;
 using Grand.Plugin.Shipping.Rodonaves.Services;
 using Grand.Services.Configuration;
 using Grand.Services.Localization;
+using Grand.Services.Logging;
 using Grand.Services.Shipping;
 using Grand.Services.Shipping.Tracking;
 using Microsoft.AspNetCore.Http;
@@ -21,19 +22,22 @@ namespace Grand.Plugin.Shipping.Rodonaves
         private readonly ILanguageService _languageService;
         private readonly IRodonavesService _rodonavesService;
         private readonly IWebHelper _webHelper;
+        private readonly ILogger _logger;
 
         public RodonavesComputationMethod(
             ISettingService settingService,
             ILocalizationService localizationService,
             ILanguageService languageService,
             IRodonavesService rodonavesService,
-            IWebHelper webHelper)
+            IWebHelper webHelper,
+            ILogger logger)
         {
             _settingService = settingService;
             _localizationService = localizationService;
             _languageService = languageService;
             _rodonavesService = rodonavesService;
             _webHelper = webHelper;
+            _logger = logger;
         }
 
         public ShippingRateComputationMethodType ShippingRateComputationMethodType => ShippingRateComputationMethodType.Realtime;
@@ -84,7 +88,7 @@ namespace Grand.Plugin.Shipping.Rodonaves
             }
             catch(Exception ex)
             {
-                // Log message
+                _logger.Error("Error requesting quote simulation on RTE Rodonaves. Check if settings are ok, and if RTE Rodonaves can attend the origin and destination regions.", ex);
             }
             
             return response;

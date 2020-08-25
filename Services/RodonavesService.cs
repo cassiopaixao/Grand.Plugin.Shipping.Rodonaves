@@ -1,5 +1,4 @@
-﻿using Grand.Core.Domain.Directory;
-using Grand.Plugin.Shipping.Rodonaves.Domain;
+﻿using Grand.Plugin.Shipping.Rodonaves.Domain;
 using Grand.Services.Catalog;
 using Grand.Services.Directory;
 using Grand.Services.Shipping;
@@ -57,16 +56,28 @@ namespace Grand.Plugin.Shipping.Rodonaves.Services
             var httpResponse = await _client.PostAsync(
                 SIMULATE_QUOTATION_ENDPOINT,
                 requestBody);
-
-            if (!httpResponse.IsSuccessStatusCode)
-                throw new Exception("Error simulating quotation at RTE Rodonaves. See logs for details.");
+            httpResponse.EnsureSuccessStatusCode();
 
             var quoteResponse = JsonConvert.DeserializeObject<QuoteSimulationModel>(await httpResponse.Content.ReadAsStringAsync());
 
             return await GetConvertedRateFromRodonavesToPrimaryCurrency(quoteResponse.Value);
         }
 
-        public async Task Auth()
+        public async Task<CityModel> CityByZipCode(string zipCode)
+        {
+            await Auth();
+            var fields = new Dictionary<string, string>() {
+                { "zipCode", ExtractNumbers(zipCode) },
+            };
+            var req = new HttpRequestMessage(HttpMethod.Get, QueryHelpers.AddQueryString(CITY_BY_ZIPCODE_ENDPOINT, fields));
+            var res = await _client.SendAsync(req);
+            res.EnsureSuccessStatusCode();
+
+            var city = JsonConvert.DeserializeObject<CityModel>(await res.Content.ReadAsStringAsync());
+            return city;
+        }
+
+        private async Task Auth()
         {
             if (_authModel != null) return;
 
@@ -78,36 +89,16 @@ namespace Grand.Plugin.Shipping.Rodonaves.Services
             };
             var req = new HttpRequestMessage(HttpMethod.Post, AUTH_ENDPOINT) { Content = new FormUrlEncodedContent(fields) };
             var res = await _client.SendAsync(req);
-
-            if (!res.IsSuccessStatusCode)
-                throw new Exception("Error simulating quotation at RTE Rodonaves. See logs for details.");
+            res.EnsureSuccessStatusCode();
 
             _authModel = JsonConvert.DeserializeObject<AuthModel>(await res.Content.ReadAsStringAsync());
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _authModel.Access_token);
         }
 
-        public async Task<CityModel> CityByZipCode(string zipCode)
-        {
-            await Auth();
-            var fields = new Dictionary<string, string>() {
-                { "zipCode", zipCode },
-            };
-            var req = new HttpRequestMessage(HttpMethod.Get, QueryHelpers.AddQueryString(CITY_BY_ZIPCODE_ENDPOINT, fields));
-            var res = await _client.SendAsync(req);
-
-            if (!res.IsSuccessStatusCode)
-                throw new Exception("Error simulating quotation at RTE Rodonaves. See logs for details.");
-
-            var city = JsonConvert.DeserializeObject<CityModel>(await res.Content.ReadAsStringAsync());
-            return city;
-        }
-
         private async Task<QuoteSimulationRequest> BuildQuoteSimulationRequest(GetShippingOptionRequest shippingOptionRequest)
         {
-            var originZipCode = ExtractNumbers(shippingOptionRequest.ZipPostalCodeFrom);
-            var destinationZipCode = ExtractNumbers(shippingOptionRequest.ShippingAddress.ZipPostalCode);
-            var originCityTask = CityByZipCode(originZipCode);
-            var destinationCityTask = CityByZipCode(destinationZipCode);
+            var originCityTask = CityByZipCode(shippingOptionRequest.ZipPostalCodeFrom);
+            var destinationCityTask = CityByZipCode(shippingOptionRequest.ShippingAddress.ZipPostalCode);
 
             var totalWeight = await _shippingService.GetTotalWeight(shippingOptionRequest);
             var totalValue = await GetDeclaredValueAsync(shippingOptionRequest);
