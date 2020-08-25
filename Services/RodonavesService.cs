@@ -1,7 +1,7 @@
-﻿using Grand.Core;
-using Grand.Core.Domain.Customers;
+﻿using Grand.Core.Domain.Directory;
 using Grand.Plugin.Shipping.Rodonaves.Domain;
-using Grand.Services.Customers;
+using Grand.Services.Catalog;
+using Grand.Services.Directory;
 using Grand.Services.Shipping;
 using Microsoft.AspNetCore.WebUtilities;
 using Newtonsoft.Json;
@@ -13,20 +13,21 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace Grand.Plugin.Shipping.Rodonaves.Services
 {
     public class RodonavesService : IRodonavesService
     {
-        private static readonly string BASE_API_URI = "https://01wapi.rte.com.br";
-        private static readonly string AUTH_ENDPOINT = "/token";
-        private static readonly string SIMULATE_QUOTATION_ENDPOINT = "/api/v1/simula-cotacao";
-        private static readonly string CITY_BY_ZIPCODE_ENDPOINT = "/api/v1/busca-por-cep";
+        private readonly string BASE_API_URI = "https://01wapi.rte.com.br";
+        private readonly string AUTH_ENDPOINT = "/token";
+        private readonly string SIMULATE_QUOTATION_ENDPOINT = "/api/v1/simula-cotacao";
+        private readonly string CITY_BY_ZIPCODE_ENDPOINT = "/api/v1/busca-por-cep";
 
-        private readonly ICustomerAttributeParser _customerAttributeParser;
-        private readonly IWorkContext _workContext;
+        private readonly string RODONAVES_CURRENCY_CODE = "BRL";
+
         private readonly IShippingService _shippingService;
+        private readonly ICurrencyService _currencyService;
+        private readonly IProductService _productService;
         private readonly HttpClient _client;
         private readonly RodonavesSettings _rodonavesSettings;
         private AuthModel _authModel;
@@ -34,13 +35,13 @@ namespace Grand.Plugin.Shipping.Rodonaves.Services
         public RodonavesService(
             RodonavesSettings rodonavesSettings,
             IShippingService shippingService,
-            IWorkContext workContext,
-            ICustomerAttributeParser customerAttributeParser)
+            IProductService productService,
+            ICurrencyService currencyService)
         {
             _rodonavesSettings = rodonavesSettings;
             _shippingService = shippingService;
-            _workContext = workContext;
-            _customerAttributeParser = customerAttributeParser;
+            _productService = productService;
+            _currencyService = currencyService;
 
             _authModel = null;
             _client = new HttpClient { BaseAddress = new Uri(BASE_API_URI) };
@@ -62,7 +63,7 @@ namespace Grand.Plugin.Shipping.Rodonaves.Services
 
             var quoteResponse = JsonConvert.DeserializeObject<QuoteSimulationModel>(await httpResponse.Content.ReadAsStringAsync());
 
-            return quoteResponse.Value;
+            return await GetConvertedRateFromRodonavesToPrimaryCurrency(quoteResponse.Value);
         }
 
         public async Task Auth()
@@ -101,19 +102,19 @@ namespace Grand.Plugin.Shipping.Rodonaves.Services
             return city;
         }
 
-        private async Task<QuoteSimulationRequest> BuildQuoteSimulationRequest(GetShippingOptionRequest getShippingOptionRequest)
+        private async Task<QuoteSimulationRequest> BuildQuoteSimulationRequest(GetShippingOptionRequest shippingOptionRequest)
         {
-            var originZipCode = ExtractNumbers(getShippingOptionRequest.ZipPostalCodeFrom);
-            var destinationZipCode = ExtractNumbers(getShippingOptionRequest.ShippingAddress.ZipPostalCode);
-            var originCityTask = await CityByZipCode(originZipCode);
-            var destinationCityTask = await CityByZipCode(destinationZipCode);
+            var originZipCode = ExtractNumbers(shippingOptionRequest.ZipPostalCodeFrom);
+            var destinationZipCode = ExtractNumbers(shippingOptionRequest.ShippingAddress.ZipPostalCode);
+            var originCityTask = CityByZipCode(originZipCode);
+            var destinationCityTask = CityByZipCode(destinationZipCode);
 
-            var totalWeight = await _shippingService.GetTotalWeight(getShippingOptionRequest);
-            var totalValue = 200.0M;
-            var customerTaxIdRegistration = await CustomerCnpjValue(_workContext.CurrentCustomer);
+            var totalWeight = await _shippingService.GetTotalWeight(shippingOptionRequest);
+            var totalValue = await GetDeclaredValueAsync(shippingOptionRequest);
+            var customerTaxIdRegistration = ExtractNumbers(_rodonavesSettings.CustomerTaxId);
 
-            var originCity = originCityTask;
-            var destinationCity = destinationCityTask;
+            var originCity = await originCityTask;
+            var destinationCity = await destinationCityTask;
 
             var quoteSimulationRequest = new QuoteSimulationRequest() {
                 OriginCityId = originCity.CityId,
@@ -128,24 +129,27 @@ namespace Grand.Plugin.Shipping.Rodonaves.Services
             return quoteSimulationRequest;
         }
 
-        private async Task<string> CustomerCnpjValue(Customer customer)
-        {
-            var cnpjValue = "";
-            var customCustomerAttributes = customer.GenericAttributes.FirstOrDefault(x => x.Key.Equals("CustomCustomerAttributes"));
-            if (customCustomerAttributes != null && !string.IsNullOrEmpty(customCustomerAttributes.Value))
-            {
-                var cnpjCustomerAttribute = (await _customerAttributeParser.ParseCustomerAttributes(customCustomerAttributes.Value)).FirstOrDefault(x => x.Name == "CNPJ");
-
-                XDocument parsedXml = XDocument.Parse(customCustomerAttributes.Value);
-                var elements = parsedXml.Root.Elements("CustomerAttribute");
-                var cnpjAttribute = elements.FirstOrDefault(x => x.Attribute("ID").Value == cnpjCustomerAttribute.Id);
-                cnpjValue = !(cnpjAttribute is null) ? cnpjAttribute.Element("CustomerAttributeValue").Element("Value").Value : "";
-            }
-            return ExtractNumbers(cnpjValue);
-        }
         private string ExtractNumbers(string value)
         {
             return Regex.Replace(value, @"[^\d]", "");
+        }
+
+        private async Task<decimal> GetDeclaredValueAsync(GetShippingOptionRequest shippingOptionRequest)
+        {
+            var productIds = shippingOptionRequest.Items.Select(x => x.ShoppingCartItem.ProductId);
+            var products = await _productService.GetProductsByIds(productIds.ToArray());
+            var declaredValue = await GetConvertedRateFromPrimaryToRodonavesCurrency(products.Sum(x => x.Price));
+            return declaredValue;
+        }
+
+        private async Task<decimal> GetConvertedRateFromPrimaryToRodonavesCurrency(decimal value)
+        {
+            return await _currencyService.ConvertFromPrimaryStoreCurrency(value, await _currencyService.GetCurrencyByCode(RODONAVES_CURRENCY_CODE));
+        }
+
+        private async Task<decimal> GetConvertedRateFromRodonavesToPrimaryCurrency(decimal value)
+        {
+            return await _currencyService.ConvertToPrimaryStoreCurrency(value, await _currencyService.GetCurrencyByCode(RODONAVES_CURRENCY_CODE));
         }
     }
 }
