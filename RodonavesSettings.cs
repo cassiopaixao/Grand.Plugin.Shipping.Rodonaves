@@ -6,5 +6,6 @@ namespace Grand.Plugin.Shipping.Rodonaves
     {
         public string ApiUsername { get; set; }
         public string ApiPassword { get; set; }
+        public string CustomerTaxId { get; set; }
     }
 }

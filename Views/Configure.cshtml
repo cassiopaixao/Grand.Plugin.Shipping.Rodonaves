@@ -1,4 +1,4 @@
-﻿@model Grand.Plugin.Shipping.Rodonaves.Models.ConfigurationModel
+﻿@model Grand.Plugin.Shipping.Rodonaves.Models.RodonavesSettingsModel
 @{
     Layout = "_ConfigurePlugin";
 }
@@ -8,15 +8,32 @@
     <div class="form-horizontal">
         <div class="form-body">
             <div class="form-group">
-                <admin-label asp-for="ApiUsername" />
-                <div class="col-md-9 col-sm-9">
-                    <admin-input asp-for="ApiUsername" />
+                <div class="col-md-3">
+                    @T("Plugins.Shipping.Rodonaves.Fields.ApiUsername")
+                </div>
+                <div class="col-md-9">
+                    @Html.EditorFor(model => model.ApiUsername)
+                    @Html.ValidationMessageFor(model => model.ApiUsername)
                 </div>
             </div>
+
             <div class="form-group">
-                <admin-label asp-for="ApiPassword" />
-                <div class="col-md-9 col-sm-9">
-                    <admin-input asp-for="ApiPassword" />
+                <div class="col-md-3">
+                    @T("Plugins.Shipping.Rodonaves.Fields.ApiPassword")
+                </div>
+                <div class="col-md-9">
+                    @Html.EditorFor(model => model.ApiPassword)
+                    @Html.ValidationMessageFor(model => model.ApiPassword)
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="col-md-3">
+                    @T("Plugins.Shipping.Rodonaves.Fields.CustomerTaxId")
+                </div>
+                <div class="col-md-9">
+                    @Html.EditorFor(model => model.CustomerTaxId)
+                    @Html.ValidationMessageFor(model => model.CustomerTaxId)
                 </div>
             </div>
         </div>

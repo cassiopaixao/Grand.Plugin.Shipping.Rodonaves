@@ -37,19 +37,21 @@ namespace Grand.Plugin.Shipping.Rodonaves.Controllers
         #region methods
         public IActionResult Configure()
         {
-            var model = new ConfigurationModel();
+            var model = new RodonavesSettingsModel();
             model.ApiUsername = _rodonavesSettings.ApiUsername;
             model.ApiPassword = _rodonavesSettings.ApiPassword;
+            model.CustomerTaxId = _rodonavesSettings.CustomerTaxId;
 
             return View("~/Plugins/Shipping.Rodonaves/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
         [AutoValidateAntiforgeryToken]
-        public async Task<IActionResult> Configure(ConfigurationModel model)
+        public async Task<IActionResult> Configure(RodonavesSettingsModel model)
         {
             _rodonavesSettings.ApiUsername = model.ApiUsername;
             _rodonavesSettings.ApiPassword = model.ApiPassword;
+            _rodonavesSettings.CustomerTaxId = model.CustomerTaxId;
             await _settingService.SaveSetting(_rodonavesSettings);
             await _settingService.ClearCache();
 

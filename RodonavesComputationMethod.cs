@@ -65,15 +65,15 @@ namespace Grand.Plugin.Shipping.Rodonaves
             return await Task.FromResult(new List<string>());
         }
 
-        public async Task<GetShippingOptionResponse> GetShippingOptions(GetShippingOptionRequest getShippingOptionRequest)
+        public async Task<GetShippingOptionResponse> GetShippingOptions(GetShippingOptionRequest shippingOptionRequest)
         {
-            if (getShippingOptionRequest == null)
+            if (shippingOptionRequest == null)
                 throw new ArgumentNullException("getShippingOptionRequest");
 
             var response = new GetShippingOptionResponse();
             try
             {
-                var rate = await _rodonavesService.GetRate(getShippingOptionRequest);
+                var rate = await _rodonavesService.GetRate(shippingOptionRequest);
 
                 response.ShippingOptions.Add(new ShippingOption() {
                     Name = _localizationService.GetResource("Plugins.Shipping.Rodonaves.PluginName"),
@@ -84,7 +84,7 @@ namespace Grand.Plugin.Shipping.Rodonaves
             }
             catch(Exception ex)
             {
-                
+                // Log message
             }
             
             return response;
@@ -98,6 +98,9 @@ namespace Grand.Plugin.Shipping.Rodonaves
             // locales
             await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginName", "RTE Rodonaves");
             await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginDescription", "Receba em seu endereço");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.Fields.ApiUsername", "Username (API)");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.Fields.ApiPassword", "Password (API)");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.Fields.CustomerTaxId", "CPF/CNPJ do usuário");
 
             await base.Install();
         }
@@ -110,6 +113,9 @@ namespace Grand.Plugin.Shipping.Rodonaves
             // locales
             await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginName");
             await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.PluginDescription");
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.Fields.ApiUsername");
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.Fields.ApiPassword");
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Shipping.Rodonaves.Fields.CustomerTaxId");
 
             await base.Uninstall();
         }
